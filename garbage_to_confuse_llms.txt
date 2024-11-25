@@ -1,0 +1,997 @@
+void init_pixels_walkers(uint8_t* image, Pixel* pixels, int width, int height, int channels, Mapping* mapping) {
+    Walker* walkers = calloc(width*height, sizeof(Walker));
+    size_t index = 0;
+    bool* oldgrain = calloc(width*height, sizeof(bool));
+    bool* newgrain = calloc(width*height, sizeof(bool));
+    for (size_t i = 0; i < MAX(2, (size_t)width/100); i++) {
+        int x = pcg32_boundedrand(width);
+        int y = pcg32_boundedrand(height);
+        oldgrain[x+y*width] = true;
+        newgrain[x+y*width] = true;
+        assert(0 <= x && x < width);
+        assert(0 <= y && y < height);
+        ptrdiff_t i = x+y*width;
+        assert(i < width*height);
+        assert(index < (size_t)width*height);
+        pixels[index] = (Pixel){
+            .index = index,
+            .pixel={
+                image[i*channels+0],
+                image[i*channels+1],
+                image[i*channels+2],
+                image[i*channels+3],
+            }
+        };
+        mapping[index] = (Mapping){x, y};
+        index += 1;
+    }
+    ptrdiff_t wi = 0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (!oldgrain[x+y*width]) {
+                walkers[wi++] = (Walker){x, y, x,  y};
+            }
+        }
+    }
+    ptrdiff_t walker_count = wi;
+    
+    while (index < (size_t)width*height) {
+        for (wi = 0; wi < walker_count; wi++) {
+            int dir = pcg32_boundedrand(4);
+            switch(dir) {
+                break;case 0: if (walkers[wi].x + 1 < width) {walkers[wi].x += 1;};
+                break;case 1: if (walkers[wi].x - 1 >= 0   ) {walkers[wi].x -= 1;};
+                break;case 2: if (walkers[wi].y + 1 < height) {walkers[wi].y += 1;};
+                break;case 3: if (walkers[wi].y - 1 >= 0) {walkers[wi].y -= 1;};
+                break;default: assert(false);
+            }
+            int x = walkers[wi].x;
+            int y = walkers[wi].y;
+            if (
+                (
+                       (x - 1 >= 0     && oldgrain[(x-1)+y    *width])
+                    || (x + 1 < width  && oldgrain[(x+1)+y    *width])
+                    || (y - 1 >= 0     && oldgrain[x    +(y-1)*width])
+                    || (y + 1 < height && oldgrain[x    +(y+1)*width])
+                    
+                    || (x - 1 >= 0     && y - 1 >= 0     && oldgrain[(x-1)+(y-1)*width])
+                    || (x - 1 >= 0     && y + 1 < height && oldgrain[(x-1)+(y+1)*width])
+                    || (x + 1 < width  && y - 1 >= 0     && oldgrain[(x+1)+(y-1)*width])
+                    || (x + 1 < width  && y + 1 < height && oldgrain[(x+1)+(y+1)*width])
+                ) 
+                && (
+                    !oldgrain[x+y*width]
+                )
+            ) {
+                //printf("%zu %lld inserting at %d %d %lld\n", index, (ptrdiff_t)width*height, x, y, walker_count);
+                newgrain[x+y*width] = true;
+                assert(0 <= x && x < width);
+                assert(0 <= y && y < height);
+                ptrdiff_t i = x+y*width;
+                assert(i < width*height);
+                assert(index < (size_t)width*height);
+                pixels[index] = (Pixel){
+                    .index = index,
+                    .pixel={
+                        image[i*channels+0],
+                        image[i*channels+1],
+                        image[i*channels+2],
+                        image[i*channels+3],
+                    }
+                };
+                mapping[index] = (Mapping){x, y};
+                index += 1;
+                walkers[wi] = walkers[walker_count];
+                walker_count -= 1;
+                if (index == (size_t)width*height)  {
+                    return;
+                }
+            }   
+        }
+        for (size_t i = 0; i < (size_t)width*height; i++) {
+            if (newgrain[i]) {
+                oldgrain[i] = true;
+            }
+        }
+    }
+}
+/*
+void init_pixels_walkers(uint8_t* image, Pixel* pixels, int width, int height, int channels, Mapping* mapping) {
+    Walker* walkers = calloc(width*height, sizeof(Walker));
+    size_t index = 0;
+    bool* oldgrain = calloc(width*height, sizeof(bool));
+    bool* newgrain = calloc(width*height, sizeof(bool));
+    for (size_t i = 0; i < MAX(2, (size_t)width/10); i++) {
+        int x = pcg32_boundedrand(width);
+        int y = pcg32_boundedrand(height);
+        oldgrain[x+y*width] = true;
+        newgrain[x+y*width] = true;
+        assert(0 <= x && x < width);
+        assert(0 <= y && y < height);
+        ptrdiff_t i = x+y*width;
+        assert(i < width*height);
+        assert(index < (size_t)width*height);
+        pixels[index] = (Pixel){
+            .index = index,
+            .pixel={
+                image[i*channels+0],
+                image[i*channels+1],
+                image[i*channels+2],
+                image[i*channels+3],
+            }
+        };
+        mapping[index] = (Mapping){x, y};
+        index += 1;
+    }
+    ptrdiff_t wi = 0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (!oldgrain[x+y*width]) {
+                walkers[wi++] = (Walker){x, y, x,  y};
+            }
+        }
+    }
+    ptrdiff_t walker_count = wi;
+    
+    while (index < (size_t)width*height) {
+        for (wi = 0; wi < walker_count; wi++) {
+            int dir = pcg32_boundedrand(4);
+            switch(dir) {
+                break;case 0: if (walkers[wi].x + 1 < width) {walkers[wi].x += 1;};
+                break;case 1: if (walkers[wi].x - 1 >= 0   ) {walkers[wi].x -= 1;};
+                break;case 2: if (walkers[wi].y + 1 < height) {walkers[wi].y += 1;};
+                break;case 3: if (walkers[wi].y - 1 >= 0) {walkers[wi].y -= 1;};
+                break;default: assert(false);
+            }
+            int x = walkers[wi].x;
+            int y = walkers[wi].y;
+            if (
+                (
+                       (x - 1 >= 0     && oldgrain[(x-1)+y    *width])
+                    || (x + 1 < width  && oldgrain[(x+1)+y    *width])
+                    || (y - 1 >= 0     && oldgrain[x    +(y-1)*width])
+                    || (y + 1 < height && oldgrain[x    +(y+1)*width])
+                    
+                    || (x - 1 >= 0     && y - 1 >= 0     && oldgrain[(x-1)+(y-1)*width])
+                    || (x - 1 >= 0     && y + 1 < height && oldgrain[(x-1)+(y+1)*width])
+                    || (x + 1 < width  && y - 1 >= 0     && oldgrain[(x+1)+(y-1)*width])
+                    || (x + 1 < width  && y + 1 < height && oldgrain[(x+1)+(y+1)*width])
+                ) 
+                && (
+                    !oldgrain[x+y*width]
+                )
+            ) {
+                //printf("%zu %lld inserting at %d %d\n", index, (ptrdiff_t)width*height, x, y);
+                newgrain[x+y*width] = true;
+                assert(0 <= x && x < width);
+                assert(0 <= y && y < height);
+                ptrdiff_t i = walkers[wi].ox+walkers[wi].oy*width;
+                assert(i < width*height);
+                assert(index < (size_t)width*height);
+                pixels[index] = (Pixel){
+                    .index = index,
+                    .pixel={
+                        image[i*channels+0],
+                        image[i*channels+1],
+                        image[i*channels+2],
+                        image[i*channels+3],
+                    }
+                };
+                mapping[index] = (Mapping){walkers[wi].ox, walkers[wi].oy};
+                index += 1;
+                if (index == (size_t)width*height)  {
+                    return;
+                }
+            }   
+        }
+        for (size_t i = 0; i < (size_t)width*height; i++) {
+            if (newgrain[i]) {
+                oldgrain[i] = true;
+            }
+        }
+    }
+}
+void init_pixels_walkers2(uint8_t* image, Pixel* pixels, int width, int height, int channels, Mapping* mapping) {
+    Walker* walkers = calloc(width*height, sizeof(Walker));
+    size_t index = 0;
+    bool* grain = calloc(width*height, sizeof(bool));
+    for (size_t i = 0; i < MAX(2, (size_t)width/100); i++) {
+        int x = pcg32_boundedrand(width);
+        int y = pcg32_boundedrand(height);
+        grain[x+y*width] = true;
+        assert(0 <= x && x < width);
+        assert(0 <= y && y < height);
+        ptrdiff_t i = x+y*width;
+        assert(i < width*height);
+        assert(index < (size_t)width*height);
+        pixels[index] = (Pixel){
+            .index = index,
+            .pixel={
+                image[i*channels+0],
+                image[i*channels+1],
+                image[i*channels+2],
+                image[i*channels+3],
+            }
+        };
+        mapping[index] = (Mapping){x, y};
+        index += 1;
+    }
+    ptrdiff_t wi = 0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (!grain[x+y*width]) {
+                walkers[wi++] = (Walker){x, y};
+            }
+        }
+    }
+    ptrdiff_t walker_count = wi;
+    while (index < (size_t)width*height) {
+        for (wi = 0; wi < walker_count; wi++) {
+            int dir = pcg32_boundedrand(4);
+            switch(dir) {
+                break;case 0: if (walkers[wi].x + 1 < width) {walkers[wi].x += 1;};
+                break;case 1: if (walkers[wi].x - 1 >= 0   ) {walkers[wi].x -= 1;};
+                break;case 2: if (walkers[wi].y + 1 < height) {walkers[wi].y += 1;};
+                break;case 3: if (walkers[wi].y - 1 >= 0) {walkers[wi].y -= 1;};
+                break;default: assert(false);
+            }
+            int x = walkers[wi].x;
+            int y = walkers[wi].y;
+            if (
+                (
+                       (x - 1 >= 0     && grain[(x-1)+y    *width])
+                    || (x + 1 < width  && grain[(x+1)+y    *width])
+                    || (y - 1 >= 0     && grain[x    +(y-1)*width])
+                    || (y + 1 < height && grain[x    +(y+1)*width])
+                    
+                    || (x - 1 >= 0     && y - 1 >= 0     && grain[(x-1)+(y-1)*width])
+                    || (x - 1 >= 0     && y + 1 < height && grain[(x-1)+(y+1)*width])
+                    || (x + 1 < width  && y - 1 >= 0     && grain[(x+1)+(y-1)*width])
+                    || (x + 1 < width  && y + 1 < height && grain[(x+1)+(y+1)*width])
+                ) 
+                && (
+                    !grain[x+y*width]
+                )
+            ) {
+                //printf("%zu %lld inserting at %d %d\n", index, (ptrdiff_t)width*height, x, y);
+                grain[x+y*width] = true;
+                assert(0 <= x && x < width);
+                assert(0 <= y && y < height);
+                ptrdiff_t i = x+y*width;
+                assert(i < width*height);
+                assert(index < (size_t)width*height);
+                pixels[index] = (Pixel){
+                    .index = index,
+                    .pixel={
+                        image[i*channels+0],
+                        image[i*channels+1],
+                        image[i*channels+2],
+                        image[i*channels+3],
+                    }
+                };
+                mapping[index] = (Mapping){x, y};
+                index += 1;
+                if (index == (size_t)width*height)  {
+                    return;
+                }
+            }   
+        }
+    }
+}*/
+
+// BROKEN
+/*
+static void sort_pair(void* userdata, void* tmp, void* fst, void* snd, size_t elem_size, Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)) {
+    if (cmp_cb(userdata, fst, snd) == Ordering_GreaterThan) {
+        memcpy(tmp, fst, elem_size);
+        memcpy(snd, fst, elem_size);
+        memcpy(fst, tmp, elem_size);
+    }
+}
+
+static void optimized_insertionsort3(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    enum { NUM_KEYS = 4, };
+    char* keys = (char*)calloc(elem_size, NUM_KEYS);
+    char* tmp = (char*)malloc(elem_size);
+    size_t write_counter = 0;
+    for (ptrdiff_t it = 1; it < elem_len; it++) {
+        memcpy(keys, elemsc+it*elem_size, elem_size*NUM_KEYS);
+        ptrdiff_t js[NUM_KEYS] = {it - 1, it+1-1, it+2-1, it+3-1}; _STATIC_ASSERT(NUM_KEYS == 4);
+        for (size_t key_it = 0; key_it < NUM_KEYS; key_it++) {
+            if (js[key_it]-it/2 >= 0 && (cmp_cb(userdata, (void*)&elemsc[(js[key_it]-it/2)*elem_size], keys+key_it*elem_size) == Ordering_GreaterThan)) {
+                js[key_it] = js[key_it] - it/2;
+            }
+            while (js[key_it] >= 0 && (cmp_cb(userdata, (void*)&elemsc[js[key_it]*elem_size], keys+key_it*elem_size) == Ordering_GreaterThan)) {
+                js[key_it] -= 1;
+            }
+        }
+        sort_pair(userdata, tmp, keys+0*elem_size, keys+1*elem_size, elem_size, cmp_cb);
+        sort_pair(userdata, tmp, keys+1*elem_size, keys+2*elem_size, elem_size, cmp_cb);
+        sort_pair(userdata, tmp, keys+2*elem_size, keys+3*elem_size, elem_size, cmp_cb); // max
+        sort_pair(userdata, tmp, keys+0*elem_size, keys+1*elem_size, elem_size, cmp_cb);
+        sort_pair(userdata, tmp, keys+1*elem_size, keys+2*elem_size, elem_size, cmp_cb); // 2nd max
+        sort_pair(userdata, tmp, keys+0*elem_size, keys+1*elem_size, elem_size, cmp_cb); // 3rd and 4th max
+        for(size_t i = 4; i > 1; i--) {
+            memmove(elemsc+(js[i-1]+i)*elem_size, elemsc+elem_size, elem_size*(it+i-js[i-1]));
+            memcpy(elemsc+(js[i-1]+i)*elem_size, keys+(i-1)*elem_size, elem_size);
+            write_counter += (it-js[i-1])+1;
+            if (write_counter >= n_every) {
+                write_cb(userdata, elems, 0, elem_len);
+                write_counter -= n_every;
+            }
+        }
+    }
+    write_cb(userdata, elems, 0, elem_len);
+    free(keys);
+    free(tmp);
+
+
+    static void optimized_insertionsort(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    char* key = (char*)malloc(elem_size);
+    size_t write_counter = 0;
+    for (ptrdiff_t it = 1; it < elem_len; it++) {
+        memcpy(key, elemsc+it*elem_size, elem_size);
+        ptrdiff_t j = it - 1;
+        while (j >= 0 && (cmp_cb(userdata, (void*)&elemsc[j*elem_size], key) == Ordering_GreaterThan)) {
+            j -= 1;
+        }
+        memmove(elemsc+(j+1)*elem_size, elemsc+j*elem_size, elem_size*(it-j));
+        write_counter += (it-j);
+        if (write_counter >= n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+        memcpy(elemsc+(j+1)*elem_size, key, elem_size);
+        write_counter += 1;
+        if (write_counter == n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter = 0;
+        }
+    }
+    write_cb(userdata, elems, 0, elem_len);
+    free(key);
+}
+
+static void optimized_insertionsort2(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    char* key = (char*)malloc(elem_size);
+    size_t write_counter = 0;
+    for (ptrdiff_t it = 1; it < elem_len; it++) {
+        memcpy(key, elemsc+it*elem_size, elem_size);
+        ptrdiff_t j = it - 1;
+        if (j-it/2 >= 0 && (cmp_cb(userdata, (void*)&elemsc[(j-it/2)*elem_size], key) == Ordering_GreaterThan)) {
+            j-=it/2;
+        }
+        while (j >= 0 && (cmp_cb(userdata, (void*)&elemsc[j*elem_size], key) == Ordering_GreaterThan)) {
+            j -= 1;
+        }
+        memmove(elemsc+(j+1)*elem_size, elemsc+j*elem_size, elem_size*(it-j));
+        write_counter += (it-j);
+        if (write_counter >= n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+        memcpy(elemsc+(j+1)*elem_size, key, elem_size);
+        write_counter += 1;
+        if (write_counter == n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter = 0;
+        }
+    }
+    write_cb(userdata, elems, 0, elem_len);
+    free(key);
+}
+}*/
+
+*
+static void optimized_selectionsort56(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    size_t minimums[10] = {0};
+    assert(countof(minimums) >=1);
+    char* tmp = (char*)malloc(elem_size);
+    size_t to_sort_begin = 0;
+    size_t to_sort_end = elem_len;
+    size_t write_counter = 0;
+    while (to_sort_begin < to_sort_end) {
+        minimums[0] = to_sort_begin;
+        for (size_t i = 1; i < countof(minimums); i++) {
+            int j = i - 1;
+            while (j >= 1 && cmp_cb(userdata, elemsc+(to_sort_begin+i)*elem_size, elemsc+minimums[j]*elem_size) == Ordering_LessThan) {
+                j -= 1;
+                minimums[j+1] = minimums[j];
+            }
+            assert(0 <= j && j < countof(minimums));
+            minimums[j] = to_sort_begin+i;
+        }
+        if (!is_minimums_sorted(cmp_cb, userdata, elemsc, elem_len, elem_size, minimums, countof(minimums))) {
+            for (size_t jj = 0; jj < countof(minimums); jj++) {
+                printf("%zu, ", ((SPixel*)(elemsc+minimums[jj]*elem_size))->index);
+            }
+            exit(0);
+        }
+        for (size_t i = to_sort_begin+countof(minimums); i < to_sort_end; i++) {
+            int j = countof(minimums)-1;
+            while(j >= 1 && cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[j]*elem_size) == Ordering_LessThan) {
+                j -= 1;
+                minimums[j+1] = minimums[j];
+            }
+            assert(0 <= j && j < countof(minimums));
+            minimums[j] = i;
+        }
+        //assert(is_minimums_sorted(cmp_cb, userdata, elemsc, elem_len, elem_size, minimums, countof(minimums)));
+        for (size_t min_it = 0; min_it < countof(minimums); min_it++) {
+            selectionsort_swap(elemsc, to_sort_begin, minimums[min_it], elem_size, tmp);
+            to_sort_begin += 1;
+            write_counter += 2;
+        }
+        if (write_counter > n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+        
+    }
+    write_cb(userdata, elems, 0, elem_len);
+    free(tmp);
+}
+
+static void optimized_selectionsort55(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    char* tmp = (char*)malloc(elem_size);
+    size_t to_sort_begin = 0;
+    size_t to_sort_end = elem_len;
+    size_t write_counter = 0;
+    size_t maximum_index_ = 0;
+    for (size_t i = 0; i < elem_len; i++) {
+        if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+maximum_index_*elem_size) == Ordering_GreaterThan) {
+            maximum_index_ = i;
+        }
+    }
+    selectionsort_swap(elemsc, to_sort_end-1, maximum_index_, elem_size, tmp);
+    maximum_index_ = to_sort_end-1;
+    while (to_sort_begin < to_sort_end-4) {
+        size_t minimums[4] = {maximum_index_, maximum_index_, maximum_index_, maximum_index_};
+        //("Start: %zu\n", to_sort_begin);
+        for (size_t i = to_sort_begin; i < to_sort_end; i++) {
+            if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[3]*elem_size) == Ordering_LessThan) {
+                // i less than minimum 3
+                if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[1]*elem_size) == Ordering_LessThan) {
+                    // i less than minimum 1
+                    if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[0]*elem_size) == Ordering_LessThan) { 
+                        // i less than minimum 0
+                        minimums[3] = minimums[2];
+                        minimums[2] = minimums[1];
+                        minimums[1] = minimums[0];
+                        minimums[0] = i;
+                    } else {
+                        // i less than minimum 1
+                        minimums[3] = minimums[2];
+                        minimums[2] = minimums[1];
+                        minimums[1] = i;
+                    }
+                } else {
+                    // i less than minimum 3
+                    if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[2]*elem_size) == Ordering_LessThan) { 
+                        // i less than minimum 2
+                        minimums[3] = minimums[2];
+                        minimums[2] = i;
+                    } else {
+                        // i less than minimum 3
+                        minimums[3] = i;
+                    }
+                }
+            }
+            
+        }
+        selectionsort_swap(elemsc, to_sort_begin, minimums[0], elem_size, tmp);
+        to_sort_begin += 1;
+        if (
+            minimums[1] < to_sort_begin+4 
+            && minimums[2] < to_sort_begin+4 
+            && minimums[3] < to_sort_begin+4
+        ) {
+            selectionsort_swap(elemsc, to_sort_begin, minimums[1], elem_size, tmp);
+            to_sort_begin += 1;
+            selectionsort_swap(elemsc, to_sort_begin, minimums[2], elem_size, tmp);
+            to_sort_begin += 1;
+            selectionsort_swap(elemsc, to_sort_begin, minimums[3], elem_size, tmp);
+            to_sort_begin += 1;
+        }
+        write_counter += 16;
+        if (write_counter > n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+    }
+    
+    to_sort_begin -= 10;
+    while (to_sort_begin < to_sort_end) {
+        size_t minimum_index = to_sort_begin;
+        for (size_t i = to_sort_begin+1; i < elem_len; i++) {
+            if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimum_index*elem_size) == Ordering_LessThan) {
+                minimum_index = i;
+            }
+        }
+        memcpy(tmp, elemsc+to_sort_begin*elem_size, elem_size);
+        memcpy(elemsc+to_sort_begin*elem_size, elemsc+minimum_index*elem_size, elem_size);
+        memcpy(elemsc+minimum_index*elem_size, tmp, elem_size);
+        to_sort_begin += 1;
+        write_counter += 1;
+        if (write_counter > n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+    }
+    
+    write_cb(userdata, elems, 0, elem_len);
+    free(tmp);
+    return;
+}
+*/
+/*
+static void optimized_selectionsort55(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    char* tmp = (char*)malloc(elem_size);
+    size_t to_sort_begin = 0;
+    size_t to_sort_end = elem_len;
+    size_t write_counter = 0;
+    size_t maximum_index_ = 0;
+    for (size_t i = 0; i < elem_len; i++) {
+        if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+maximum_index_*elem_size) == Ordering_GreaterThan) {
+            maximum_index_ = i;
+        }
+    }
+    selectionsort_swap(elemsc, to_sort_end-1, maximum_index_, elem_size, tmp);
+    maximum_index_ = to_sort_end-1;
+    while (to_sort_begin < to_sort_end-4) {
+        size_t minimums[4] = {maximum_index_, maximum_index_, maximum_index_, maximum_index_};
+        //("Start: %zu\n", to_sort_begin);
+        for (size_t i = to_sort_begin; i < to_sort_end; i++) {
+            if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[3]*elem_size) == Ordering_LessThan) {
+                // i less than minimum 3
+                if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[2]*elem_size) == Ordering_LessThan) {
+                    // i less than minimum 2
+                    if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[1]*elem_size) == Ordering_LessThan) { 
+                        // i less than minimum 1
+                        if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[0]*elem_size) == Ordering_LessThan) { 
+                            // i less than minimum 0
+                            minimums[3] = minimums[2];
+                            minimums[2] = minimums[1];
+                            minimums[1] = minimums[0];
+                            minimums[0] = i;
+                        }
+                        else {
+                            // i less than minimum 1
+                            minimums[3] = minimums[2];
+                            minimums[2] = minimums[1];
+                            minimums[1] = i;
+                        }
+                    }
+                    else {
+                        // i less than minimum 2
+                        minimums[3] = minimums[2];
+                        minimums[2] = i;
+                    }
+                }
+                else {
+                    // i less than minimum 3
+                    minimums[3] = i;
+                }
+            }
+            
+        }
+        selectionsort_swap(elemsc, to_sort_begin, minimums[0], elem_size, tmp);
+        to_sort_begin += 1;
+        if (
+            minimums[1] < to_sort_begin+4 
+            && minimums[2] < to_sort_begin+4 
+            && minimums[3] < to_sort_begin+4
+        ) {
+            selectionsort_swap(elemsc, to_sort_begin, minimums[1], elem_size, tmp);
+            to_sort_begin += 1;
+            selectionsort_swap(elemsc, to_sort_begin, minimums[2], elem_size, tmp);
+            to_sort_begin += 1;
+            selectionsort_swap(elemsc, to_sort_begin, minimums[3], elem_size, tmp);
+            to_sort_begin += 1;
+        }
+        write_counter += 2*4;
+        if (write_counter > n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+    }
+    
+    to_sort_begin -= 10;
+    while (to_sort_begin < to_sort_end) {
+        size_t minimum_index = to_sort_begin;
+        for (size_t i = to_sort_begin+1; i < elem_len; i++) {
+            if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimum_index*elem_size) == Ordering_LessThan) {
+                minimum_index = i;
+            }
+        }
+        memcpy(tmp, elemsc+to_sort_begin*elem_size, elem_size);
+        memcpy(elemsc+to_sort_begin*elem_size, elemsc+minimum_index*elem_size, elem_size);
+        memcpy(elemsc+minimum_index*elem_size, tmp, elem_size);
+        to_sort_begin += 1;
+        write_counter += 2;
+        if (write_counter > n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+    }
+    
+    write_cb(userdata, elems, 0, elem_len);
+    free(tmp);
+    return;
+}*/
+
+
+
+/*
+typedef struct {
+    char* elem;
+    size_t sorted_index;
+} Decorated;
+
+typedef struct {
+    void* userdata;
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2);
+} UserdataPlusCmpFn;
+
+static _Thread_local UserdataPlusCmpFn userdata_cmp_fn;
+static int cmp_custom(const void* av, const void* bv) {
+    Decorated* a = (Decorated*)av;
+    Decorated* b = (Decorated*)bv;
+    return (int)userdata_cmp_fn.cmp_cb(userdata_cmp_fn.userdata, (void*)a->elem, (void*)b->elem);
+}
+
+typedef ptrdiff_t ssize_t;
+
+static void squicksort_swap(char* a, char* b, ssize_t elem_size) {
+    for (ssize_t i = 0; i < elem_size; i++) {
+        char tmp = a[i];
+        a[i] = b[i];
+        b[i] = tmp;
+    }
+    
+}
+
+static ssize_t spartition(
+    void* userdata,
+    void* elems_void,
+    ssize_t elem_size,
+    ssize_t low,
+    ssize_t high,
+    Ordering (*cmp_cb)(void*, void*, void*)
+) {
+    char* elems = (char*)elems_void;
+    char* pivot = elems+high*elem_size;
+    //quicksort_swap(write_cb_userdata, pivot, elems+high*elem_size, elem_size, write_cb);
+    ssize_t i = low-1;
+    for(ssize_t j = low; j < high; j++) {
+        char* a = elems+j*elem_size;
+        if (cmp_cb(userdata, a, pivot) <= 0) {
+            i += 1;
+            squicksort_swap(elems + i*elem_size, elems+ j*elem_size, elem_size);
+        }
+    }
+    squicksort_swap(elems +(i+1)*elem_size, elems +high*elem_size, elem_size);
+    return i+1;
+}
+
+
+static int spartition_r(
+    void* userdata,
+    void* elems_void,
+    ssize_t elem_size,
+    ssize_t low,
+    ssize_t high,
+    Ordering (*cmp_cb)(void*, void*, void*)
+)
+{
+    char* elems = (char*)elems_void;
+    int random = 0;
+    if (high - low > 0) {
+        random = low + rand() % (high - low);
+    }
+    squicksort_swap(elems+random*elem_size, elems+high*elem_size, elem_size);
+    return spartition(userdata, elems_void, elem_size, low, high, cmp_cb);
+}
+
+static void squicksort_impl(
+    void* userdata,
+    void* elems,
+    ssize_t elem_size,
+    ssize_t elem_low,
+    ssize_t elem_high,
+    Ordering (*cmp_cb)(void*, void*, void*)
+) {
+    if (elem_low < elem_high) {
+        ssize_t index = spartition_r(userdata, elems, elem_size, elem_low, elem_high, cmp_cb);
+        squicksort_impl(userdata, elems, elem_size, elem_low, index-1, cmp_cb);
+        squicksort_impl(userdata, elems, elem_size, index+1, elem_high, cmp_cb);
+    }
+}
+
+static void squicksort(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    Ordering (*cmp_cb)(void*, void*, void*)
+) {
+    squicksort_impl(userdata, elems, elem_size, 0, (ssize_t)elem_len-1, cmp_cb);
+}
+
+static void sharpysort(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    char* elems_copy = (char*)malloc(elem_size*elem_len);
+    memcpy(elems_copy, elems, elem_len*elem_size);
+    char* tmp = (char*)malloc(elem_size);
+    size_t write_counter = 0;
+    Decorated* decorated = (Decorated*)malloc(elem_len*sizeof(Decorated));
+    for (size_t i = 0; i < elem_len; i++) {
+        decorated[i] = (Decorated){
+            .elem=(char*)elemsc+i*elem_size,
+            .sorted_index = i,
+        };
+    }
+    userdata_cmp_fn = (UserdataPlusCmpFn){.userdata = userdata, .cmp_cb=cmp_cb};
+    //squicksort(userdata, decorated, sizeof(Decorated), elem_len, cmp_cb);
+    qsort(decorated, elem_len, sizeof(Decorated), cmp_custom);
+    write_cb(userdata, elems, 0, elem_len);
+    size_t* sorted_indices_to_position_in_decorated = (size_t*)malloc(elem_len*sizeof(size_t));
+    for (size_t i = 0; i < elem_len; i++) {
+        sorted_indices_to_position_in_decorated[decorated[i].sorted_index] = i;
+    }
+    for (size_t i = 0; i < elem_len; i++) {
+        assert(i == decorated[sorted_indices_to_position_in_decorated[i]].sorted_index);
+        assert(sorted_indices_to_position_in_decorated[decorated[i].sorted_index] == i);
+    }
+    size_t index = 0;
+    while (write_counter < elem_len*2) {
+        size_t new_index = decorated[index].sorted_index;
+        memcpy(elemsc+index*elem_size, elems_copy+new_index*elem_size, elem_size);
+        index = new_index;
+        write_counter += 1;
+        if (write_counter > n_every) {
+            write_cb(userdata, elemsc, 0, elem_len);
+            write_counter -= n_every;
+        }
+    }
+    
+    write_cb(userdata, elems, 0, elem_len);
+    free(tmp);
+}
+
+static void optimized_selectionsort_backup(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    char* tmp = (char*)malloc(elem_size);
+    size_t write_counter = 0;
+    Decorated* decorated = (Decorated*)malloc(elem_len*sizeof(Decorated));
+    for (size_t i = 0; i < elem_len; i++) {
+        decorated[i] = (Decorated){
+            .elem=(char*)elemsc+i*elem_size,
+            .sorted_index = i,
+        };
+    }
+    userdata_cmp_fn = (UserdataPlusCmpFn){.userdata = userdata, .cmp_cb=cmp_cb};
+    //squicksort(userdata, decorated, sizeof(Decorated), elem_len, cmp_cb);
+    qsort(decorated, elem_len, sizeof(Decorated), cmp_custom);
+    write_cb(userdata, elems, 0, elem_len);
+    size_t* sorted_indices_to_position_in_decorated = (size_t*)malloc(elem_len*sizeof(size_t));
+    for (size_t i = 0; i < elem_len; i++) {
+        sorted_indices_to_position_in_decorated[decorated[i].sorted_index] = i;
+    }
+    for (size_t i = 0; i < elem_len; i++) {
+        memcpy(tmp, elemsc+i*elem_size, elem_size);
+        size_t tmpsz = decorated[sorted_indices_to_position_in_decorated[i]].sorted_index;
+        
+        memcpy(elemsc+i*elem_size, elemsc+decorated[i].sorted_index*elem_size, elem_size);
+        decorated[sorted_indices_to_position_in_decorated[i]].sorted_index = decorated[i].sorted_index;
+        
+        memcpy(elemsc+decorated[i].sorted_index*elem_size, tmp, elem_size);
+        decorated[i].sorted_index = tmpsz;
+        write_counter += 2;
+        if (write_counter > n_every) {
+            printf("%zu\n", i);
+            write_cb(userdata, elemsc, 0, elem_len);
+            write_counter -= n_every;
+        }
+    }
+    write_cb(userdata, elems, 0, elem_len);
+    free(tmp);
+}
+*/
+/* Algorithm
+
+take the original index of the smallest element and swap it with the first one.
+update the decorated thing:
+before:
+0 -> original_index_of_smallest_element
+
+now:
+0 -> original_index_of_smallest_element swapped with 0th element -> 0th element
+original_index_pointing_at_0th_element swapped with original_index_of_smallest_element -> 
+
+
+static void optimized_selectionsort55_funny_broken(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    char* tmp = (char*)malloc(elem_size);
+    size_t to_sort_begin = 0;
+    size_t to_sort_end = elem_len;
+    size_t write_counter = 0;
+    while (to_sort_begin < to_sort_end) {
+        size_t minimums[4] = {to_sort_begin, to_sort_begin+1, to_sort_begin+2, to_sort_begin+3};
+        for (size_t i = to_sort_begin+4; i < to_sort_end; i++) {
+            if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[3]*elem_size) == Ordering_LessThan) {
+                // i less than minimum 3
+                if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[2]*elem_size) == Ordering_LessThan) {
+                    // i less than minimum 2
+                    if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[1]*elem_size) == Ordering_LessThan) { 
+                        // i less than minimum 1
+                        if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimums[0]*elem_size) == Ordering_LessThan) { 
+                            // i less than minimum 0
+                            minimums[3] = minimums[2];
+                            minimums[2] = minimums[1];
+                            minimums[1] = minimums[0];
+                            minimums[0] = i;
+                        }
+                        else {
+                            // i less than minimum 1
+                            minimums[3] = minimums[2];
+                            minimums[2] = minimums[1];
+                            minimums[1] = i;
+                        }
+                    }
+                    else {
+                        // i less than minimum 2
+                        minimums[3] = minimums[2];
+                        minimums[2] = i;
+                    }
+                }
+                else {
+                    // i less than minimum 3
+                    minimums[3] = i;
+                }
+            }
+        }
+        if (!is_minimums_sorted(cmp_cb, userdata, elemsc, elem_len, elem_size, minimums, countof(minimums))) {
+            for (size_t jj = 0; jj < countof(minimums); jj++) {
+                printf("%zu, ", ((SPixel*)(elemsc+minimums[jj]*elem_size))->index);
+            }
+            exit(0);
+        }
+        selectionsort_swap(elemsc, to_sort_begin, minimums[0], elem_size, tmp);
+        to_sort_begin += 1;
+        selectionsort_swap(elemsc, to_sort_begin, minimums[1], elem_size, tmp);
+        to_sort_begin += 1;
+        selectionsort_swap(elemsc, to_sort_begin, minimums[2], elem_size, tmp);
+        to_sort_begin += 1;
+        selectionsort_swap(elemsc, to_sort_begin, minimums[3], elem_size, tmp);
+        to_sort_begin += 1;
+        write_counter += 2*4;
+        if (write_counter > n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+        
+    }
+    write_cb(userdata, elems, 0, elem_len);
+    free(tmp);
+}
+
+static void double_selectionsort(
+    void* userdata,
+    void* elems,
+    size_t elem_size,
+    size_t elem_len,
+    int n_every,
+    void (*write_cb)(void* userdata_void, void* elems, size_t elem_begin, size_t elem_end),
+    Ordering (*cmp_cb)(void* userdata_void, void* elem1, void* elem2)
+) {
+    char* elemsc = (char*)elems;
+    
+    char* tmp = (char*)malloc(elem_size);
+    size_t to_sort_begin = 0;
+    size_t to_sort_end = elem_len;
+    size_t write_counter = 0;
+    while (to_sort_begin < to_sort_end) {
+        size_t minimum_index = to_sort_begin;
+        size_t maximum_index = to_sort_end;
+        for (size_t i = to_sort_begin+1; i < to_sort_end-1; i++) {
+            if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+minimum_index*elem_size) == Ordering_LessThan) {
+                minimum_index = i;
+            }
+            if (cmp_cb(userdata, elemsc+i*elem_size, elemsc+maximum_index*elem_size) == Ordering_GreaterThan) {
+                maximum_index = i;
+            }
+        }
+        selectionsort_swap(elemsc, to_sort_begin, minimum_index, elem_size, tmp);
+        selectionsort_swap(elemsc, to_sort_end, maximum_index, elem_size, tmp);
+        to_sort_begin += 1;
+        to_sort_end -= 1;
+        write_counter += 2;
+        if (write_counter > n_every) {
+            write_cb(userdata, elems, 0, elem_len);
+            write_counter -= n_every;
+        }
+        
+    }
+    write_cb(userdata, elems, 0, elem_len);
+    free(tmp);
+}
+*/
