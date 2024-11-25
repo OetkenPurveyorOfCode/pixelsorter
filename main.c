@@ -1298,6 +1298,61 @@ Ordering compare_color_cb(void* userdata, void* p1v, void* p2v) {
     } 
 }
 
+const char help_string[] = (
+    "pixelsorter [OPTIONS] <image>\n"
+    "\n"
+    "OPTIONS:\n"
+    "-h, --help                  Display this help message\n"
+    "--wait                      Wait for stdin input\n"
+    "-r, --record <filename>     Record video with ffmpeg\n"
+    "-n, --number_of_frames      Currently broken, number of write equivalents\n"
+    "-s <sort>, --sort <sort>    Select sorting algorithm <sort>\n"
+    "                                Fast sorts:\n"
+    "                                    quicksort\n"
+    "                                    heap_quicksort\n"
+    "                                    heapsort\n"
+    "                                    mergesort (default)\n"
+    "                                    circlesort\n"
+    "                                    shellsort\n"
+    "                                Slow sorts\n"
+    "                                    selectionsort\n"
+    "                                    insertionsort\n"
+    "                                    heap_insertionsort\n"
+    "                                Super slow sorts\n"
+    "                                    unopt_selectionsort\n"
+    "                                    double_selectionsort\n"
+    "                                    moving_selectionsort\n"
+    "                                    unopt_insertionsort\n"
+    "                                    middle_out_sort\n"
+    "                                    bubblesort\n"
+    "                                    heap_bubblesort\n"
+    "                                    oddevensort\n"
+    "-p <pat>, --pattern <pat>   Select pattern\n"
+    "                                linear\n"
+    "                                hilbert (default)\n"
+    "                                spiral\n"
+    "                                random\n"
+    "                                blockys\n"
+    "                                blockys_regular\n"
+    "                                blockys_shuffle\n"
+    "                                maze\n"
+    "                                brick\n"
+    "                                voronoi\n"
+    "                                voronoi2\n"
+    "                                walkers\n"
+    "                                rings\n"
+    "                                rain\n"
+    "-c <cmp>, --cmp <cmp>       Select comparision callback\n"
+    "                                index (default)\n"
+    "                                reverse\n"
+    "                                color\n"
+    "                                horizontal\n"
+    "-m <mode>, --mode <mode>    Mode\n"
+    "                                none\n"
+    "                                shuffle (default)\n"
+    "                                reverse\n"
+    "\n\n"
+);
 int main(int argc, char** argv) {
     pcg32_srandom(234, 789);
     char filename[MAX_PATH+1] = {0};
@@ -1311,8 +1366,8 @@ int main(int argc, char** argv) {
     size_t video_hold = 120;
     int n_every = 1000;
     for (int arg_it = 1; arg_it < argc; arg_it++) {
-        if (streq(argv[arg_it], "-h")) {
-            printf("Help page not implemented! Sorry!");
+        if (streq(argv[arg_it], "-h") || streq(argv[arg_it], "--help")) {
+            fwrite(help_string, 1, sizeof(help_string), stdout);
             exit(0);
         }
         else if (streq(argv[arg_it], "--wait")) {
@@ -1321,30 +1376,36 @@ int main(int argc, char** argv) {
         else if (streq(argv[arg_it], "-s") || streq(argv[arg_it], "--sort")) {
             if (arg_it + 1 < argc) {
                 arg_it += 1;
+                // fast sorts
                 if (streq(argv[arg_it], "quicksort")) {
                     sort = SA_QUICK_SORT;
                 }
-                else if (streq(argv[arg_it], "heap_insertionsort")) {
-                    sort = SA_HEAP_INSERTION_SORT;
+                else if (streq(argv[arg_it], "heap_quicksort")) {
+                    sort = SA_HEAP_QUICKSORT;
+                }
+                else if (streq(argv[arg_it], "heapsort")) {
+                    sort = SA_HEAP_SORT;
                 }
                 else if (streq(argv[arg_it], "mergesort")) {
                     sort = SA_MERGE_SORT;
                 }
-                else if (streq(argv[arg_it], "insertionsort")) {
-                    sort = SA_INSERTION_SORT;
-                }
-                else if (streq(argv[arg_it], "middle_out_sort")) {
-                    sort = SA_MIDDLE_OUT_SORT;
-                }
-                else if (streq(argv[arg_it], "selectionsort")) {
-                    sort = SA_SELECTION_SORT;
-                }
                 else if (streq(argv[arg_it], "circlesort")) {
                     sort = SA_CIRCLE_SORT;
                 }
-                else if (streq(argv[arg_it], "heap_bubblesort")) {
-                    sort = SA_HEAP_BUBBLE_SORT;
+                else if (streq(argv[arg_it], "shellsort")) {
+                    sort = SA_SHELL_SORT;
                 }
+                // slow sorts
+                else if (streq(argv[arg_it], "selectionsort")) {
+                    sort = SA_SELECTION_SORT;
+                }
+                else if (streq(argv[arg_it], "insertionsort")) {
+                    sort = SA_INSERTION_SORT;
+                }
+                else if (streq(argv[arg_it], "heap_insertionsort")) {
+                    sort = SA_HEAP_INSERTION_SORT;
+                }
+                // super slow sorts
                 else if (streq(argv[arg_it], "unopt_selectionsort")) {
                     sort = SA_UNOPT_SELECTION_SORT;
                 }
@@ -1354,23 +1415,20 @@ int main(int argc, char** argv) {
                 else if (streq(argv[arg_it], "moving_selectionsort")) {
                     sort = SA_MOVING_SELECTION_SORT;
                 }
-                else if (streq(argv[arg_it], "shellsort")) {
-                    sort = SA_SHELL_SORT;
+                else if (streq(argv[arg_it], "unopt_insertionsort")) {
+                    sort = SA_UNOPT_INSERTION_SORT;
                 }
-                else if (streq(argv[arg_it], "heap_quicksort")) {
-                    sort = SA_HEAP_QUICKSORT;
-                }
-                else if (streq(argv[arg_it], "heapsort")) {
-                    sort = SA_HEAP_SORT;
-                }
-                else if (streq(argv[arg_it], "oddevensort")) {
-                    sort = SA_ODD_EVEN_SORT;
+                else if (streq(argv[arg_it], "middle_out_sort")) {
+                    sort = SA_MIDDLE_OUT_SORT;
                 }
                 else if (streq(argv[arg_it], "bubblesort")) {
                     sort = SA_BUBBLE_SORT;
                 }
-                else if (streq(argv[arg_it], "unopt_insertionsort")) {
-                    sort = SA_UNOPT_INSERTION_SORT;
+                else if (streq(argv[arg_it], "heap_bubblesort")) {
+                    sort = SA_HEAP_BUBBLE_SORT;
+                }
+                else if (streq(argv[arg_it], "oddevensort")) {
+                    sort = SA_ODD_EVEN_SORT;
                 }
                 else {
                     fprintf(stderr, "Invalid option for sort %s\n", argv[arg_it]);
