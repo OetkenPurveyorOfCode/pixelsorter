@@ -93,9 +93,22 @@ void shuffle_pixels(Pixel* pixels, size_t len) {
     }
 }
 
-bool is_sorted(Pixel* pixels, size_t len) {
+void reverse_pixels(Pixel* pixels, size_t len) {
+    size_t begin = 0;
+    size_t end = len - 1;
+    while (begin < end) {
+        Pixel tmp = pixels[begin];
+        pixels[begin] = pixels[end];
+        pixels[end] = tmp;
+        begin += 1;
+        end -= 1;
+    }
+}
+
+bool is_sorted(void* userdata, Pixel* pixels, size_t len, cmp_cb cmp_cb) {
+    (void)userdata;
     for (size_t i = 0; i < len -1; i++) {
-        if (pixels[i].index > pixels[i+1].index) {
+        if (cmp_cb(userdata, &pixels[i], &pixels[i+1]) == Ordering_GreaterThan) {
             printf("at p[%zu] < p[%zu], p has len %zu, index cmp values %zu before %zu\n", i, i+1, len, pixels[i].index, pixels[i+1].index);
             return false;
         }
@@ -365,7 +378,7 @@ void init_pixels_blockys(uint8_t* image, Pixel* pixels, int width, int height, i
         }
     }
     //printf("i %d %d\n", index, width*height);
-    for (size_t li = 0; li < width*height; li++) {
+    for (size_t li = 0; li < (size_t)width*height; li++) {
         //printf("i %d --> %d %d\n", li, mapping[li].x, mapping[li].y);
     }
     //printf("inited");
@@ -457,7 +470,7 @@ void init_pixels_blockys_regular(uint8_t* image, Pixel* pixels, int width, int h
         }
     }
     //printf("i %d %d\n", index, width*height);
-    for (size_t li = 0; li < width*height; li++) {
+    for (size_t li = 0; li < (size_t)width*height; li++) {
         //printf("i %d --> %d %d\n", li, mapping[li].x, mapping[li].y);
     }
     //printf("inited");
@@ -550,7 +563,7 @@ void init_pixels_blockys_shuffle(uint8_t* image, Pixel* pixels, int width, int h
         }
     }
     //printf("i %d %d\n", index, width*height);
-    for (size_t li = 0; li < width*height; li++) {
+    for (size_t li = 0; li < (size_t)width*height; li++) {
         //printf("i %d --> %d %d\n", li, mapping[li].x, mapping[li].y);
     }
     //printf("inited");
@@ -563,7 +576,7 @@ typedef struct {
 
 void maze_insert(uint8_t* image, Pixel* pixels, int width, int height, int channels, Mapping* mapping, MazeCell* grid, int x, int y, int direction, size_t* index) {
     ptrdiff_t i = x+y*width;
-    assert(*index < width*height);
+    assert(*index < (size_t)width*height);
     assert(i < width*height);
     pixels[*index] = (Pixel){
         .index = *index,
@@ -639,7 +652,7 @@ void init_pixels_maze(uint8_t* image, Pixel* pixels, int width, int height, int 
             }
             //printf("inserting at %d %d\n", x, y);
             maze_insert(image, pixels, width, height, channels, mapping, grid, x, y, direction, &index);
-            if (index == width*height) {
+            if (index == (size_t)width*height) {
                 free(grid);
                 return;
             }
@@ -741,7 +754,7 @@ void init_pixels_voronoi(uint8_t* image, Pixel* pixels, int width, int height, i
         mapping[index] = (Mapping){x, y};
         index += 1;
     }
-    while (index < width*height) {
+    while (index < (size_t)width*height) {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 if (
@@ -815,7 +828,7 @@ void init_pixels_voronoi2(uint8_t* image, Pixel* pixels, int width, int height, 
         mapping[index] = (Mapping){x, y};
         index += 1;
     }
-    while (index < width*height) {
+    while (index < (size_t)width*height) {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 if (
@@ -1250,45 +1263,6 @@ Ordering compare_index_horizontal(void* userdata_v, void* p1v, void* p2v) {
     } 
 }
 
-static inline __attribute__((always_inline))
-Ordering compare_index_xor2(void* userdata_v, void* p1v, void* p2v) {
-    Userdata* userdata = (Userdata*)userdata_v;
-    Pixel* p1 = (Pixel*)p1v;
-    Pixel* p2 = (Pixel*)p2v;
-    int x1 = p1->index % userdata->width;
-    int x2 = p2->index % userdata->width;
-    int y1 = p1->index / userdata->width;
-    int y2 = p2->index / userdata->width;
-    x1 = x1 ^ y1;
-    x2 = x2 ^ y2;
-    if (x1 < x2) {
-        return Ordering_LessThan;
-    }
-    else if (x1 > x2) {
-        return Ordering_GreaterThan;
-    }
-    else {
-        return Ordering_Equal;
-    } 
-}
-
-static inline __attribute__((always_inline))
-Ordering compare_index_xor(void* userdata_v, void* p1v, void* p2v) {
-    Userdata* userdata = (Userdata*)userdata_v;
-    Pixel* p1 = (Pixel*)p1v;
-    Pixel* p2 = (Pixel*)p2v;
-    int x1 = p1->index + p1->pixel[2];
-    int x2 = p2->index + p2->pixel[2];
-    if (x1 < x2) {
-        return Ordering_LessThan;
-    }
-    else if (x1 > x2) {
-        return Ordering_GreaterThan;
-    }
-    else {
-        return Ordering_Equal;
-    } 
-}
 
 static inline __attribute__((always_inline))
 Ordering compare_index_rev_cb(void* userdata, void* p1v, void* p2v) {
@@ -1418,7 +1392,7 @@ int main(int argc, char** argv) {
                 videoname[MAX_PATH-1]='\0';
             }
         }
-        else if (streq(argv[arg_it], "-n")) {
+        else if (streq(argv[arg_it], "-n") || streq(argv[arg_it], "--number_of_frames")) {
             if (arg_it + 1 < argc) {
                 arg_it += 1;
                 ParseIntResult result = sv_parse_int((sv){.data=argv[arg_it], .len=strlen(argv[arg_it])});
@@ -1490,20 +1464,52 @@ int main(int argc, char** argv) {
                 exit(0);
             }
         }
-        else if (streq(argv[arg_it], "--cmp_color")) {
-            compare_callback = compare_color_cb;
+        else if (streq(argv[arg_it], "-c") || streq(argv[arg_it], "--cmp")) {
+            if (arg_it + 1 < argc) {
+                arg_it += 1;
+                if (streq(argv[arg_it], "index")) {
+                    compare_callback = compare_index_cb;
+                }
+                else if (streq(argv[arg_it], "reverse")) {
+                    compare_callback = compare_index_rev_cb;
+                }
+                else if (streq(argv[arg_it], "horizontal")) {
+                    compare_callback = compare_index_horizontal;
+                }
+                else if (streq(argv[arg_it], "color")) {
+                    compare_callback = compare_color_cb;
+                }
+                else {
+                    fprintf(stderr, "Invalid option for cmp: %s\n", argv[arg_it]);
+                    exit(0);
+                }
+            }
+            else {
+                fprintf(stderr, "Option `--cmp` missing 1 required positional argument\n");
+                exit(0);
+            }
         }
-        else if (streq(argv[arg_it], "--cmp_rev_index")) {
-            compare_callback = compare_index_rev_cb;
-        }
-        else if (streq(argv[arg_it], "--cmp_index_horiz")) {
-            compare_callback = compare_index_horizontal;
-        }
-        else if (streq(argv[arg_it], "--cmp_index_xor")) {
-            compare_callback = compare_index_xor;
-        }
-        else if (streq(argv[arg_it], "--no_shuffle")) {
-            init_mode = IM_NONE;
+        else if (streq(argv[arg_it], "-m") || streq(argv[arg_it], "--mode")) {
+            if (arg_it + 1 < argc) {
+                arg_it += 1;
+                if (streq(argv[arg_it], "none")) {
+                    init_mode = IM_NONE;
+                }
+                else if (streq(argv[arg_it], "reverse")) {
+                    init_mode = IM_REVERSE;
+                }
+                else if (streq(argv[arg_it], "shuffle")) {
+                    init_mode = IM_SHUFFLE;
+                }
+                else {
+                    fprintf(stderr, "Invalid option for init mode: %s\n", argv[arg_it]);
+                    exit(0);
+                }
+            }
+            else {
+                fprintf(stderr, "Option `--mode` missing 1 required positional argument\n");
+                exit(0);
+            }
         }
         else {
             if (strlen(argv[arg_it]) > MAX_PATH) {
@@ -1589,7 +1595,7 @@ int main(int argc, char** argv) {
         shuffle_pixels(pixels, width*height);
     }
     if (init_mode == IM_REVERSE) {
-        // reverse pixels
+        reverse_pixels(pixels, width*height);
     }
     Userdata userdata = {
         .window = window,
@@ -1682,7 +1688,7 @@ int main(int argc, char** argv) {
             assert(ffmpeg_end_rendering(ffmpeg, false));
             userdata.record_with_ffmpeg = false;
         }
-        assert(is_sorted(pixels, width*height));
+        assert(is_sorted(&userdata, pixels, width*height, compare_callback));
         printf("Sorted!");
     }
     return 0;

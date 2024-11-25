@@ -995,3 +995,42 @@ static void double_selectionsort(
     free(tmp);
 }
 */
+
+static inline __attribute__((always_inline))
+Ordering compare_index_xor2(void* userdata_v, void* p1v, void* p2v) {
+    Userdata* userdata = (Userdata*)userdata_v;
+    Pixel* p1 = (Pixel*)p1v;
+    Pixel* p2 = (Pixel*)p2v;
+    int x1 = p1->index % userdata->width;
+    int x2 = p2->index % userdata->width;
+    int y1 = p1->index / userdata->width;
+    int y2 = p2->index / userdata->width;
+    x1 = x1 ^ y1;
+    x2 = x2 ^ y2;
+    if (x1 < x2) {
+        return Ordering_LessThan;
+    }
+    else if (x1 > x2) {
+        return Ordering_GreaterThan;
+    }
+    else {
+        return Ordering_Equal;
+    } 
+}
+
+static inline __attribute__((always_inline))
+Ordering compare_index_xor(void* userdata_v, void* p1v, void* p2v) {
+    Pixel* p1 = (Pixel*)p1v;
+    Pixel* p2 = (Pixel*)p2v;
+    int x1 = p1->index + p1->pixel[2];
+    int x2 = p2->index + p2->pixel[2];
+    if (x1 < x2) {
+        return Ordering_LessThan;
+    }
+    else if (x1 > x2) {
+        return Ordering_GreaterThan;
+    }
+    else {
+        return Ordering_Equal;
+    } 
+}
