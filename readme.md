@@ -16,7 +16,7 @@ A pixel sorting algorithm visualisation.
 .\build_release.bat
 ```
 
-## Example
+## Examples
 
 Simple example for mergesort + hilbert curve:
 ```
